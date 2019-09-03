@@ -88,7 +88,7 @@ module.exports = (server, app, sessionMiddleware) => {
 
     // 방장 권한 위임
     socket.on('hand_over', (data) => {
-      console.log('----------------data--------------------');
+      console.log('----------------data----------------');
       console.log(data);
       
       // 방장 바꾸기
