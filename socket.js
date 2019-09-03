@@ -32,21 +32,22 @@ module.exports = (server, app, sessionMiddleware) => {
       .split('/')[referer.split('/').length - 1]
       .replace(/\?.+/, '');
     socket.join(roomId);
-    socket.to(roomId).emit('join', {
-      user: 'system',
-      chat: `${req.session.color}님이 입장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
-      number: socket.adapter.rooms[roomId].length
-    });
-    // axios.post(`http://localhost:8005/room/${roomId}/sys`,{
-    //   type:'join',
+    // socket.to(roomId).emit('join', {
     //   user: 'system',
-    //   chat: `${req.session.color}님이 입장하셨습니다.`,
+    //   chat: `${req.session.color}님이 입장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
     //   number: socket.adapter.rooms[roomId].length
-    // }, {
-    //   headers: {
-    //     Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
-    //   },
-    // })
+    // });
+    axios.post(`http://localhost:8005/room/${roomId}/sys`, {
+      type: 'join',
+      user: 'system',
+      chat: `${req.session.color} 님이 입장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
+      number: socket.adapter.rooms[roomId].length
+    }, {
+      headers: {
+        Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
+      },
+    });
+
     socket.on('disconnect', () => {
       console.log('chat 네임스페이스 접속 해제');
       socket.leave(roomId);
@@ -61,21 +62,21 @@ module.exports = (server, app, sessionMiddleware) => {
             console.error(error);
           });
       } else {
-        socket.to(roomId).emit('exit', {
-          user: 'system',
-          chat: `${req.session.color}님이 퇴장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
-          number: socket.adapter.rooms[roomId].length
-        });
-        // axios.post(`http://localhost:8005/room/${roomId}/sys`,{
-        //   type:'eixt',
+        // socket.to(roomId).emit('exit', {
         //   user: 'system',
-        //   chat: `${req.session.color}님이 퇴장하셨습니다.`,
+        //   chat: `${req.session.color}님이 퇴장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
         //   number: socket.adapter.rooms[roomId].length
-        // }, {
-        //   headers: {
-        //     Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
-        //   },
-        // })
+        // });
+        axios.post(`http://localhost:8005/room/${roomId}/sys`,{
+          type:'eixt',
+          user: 'system',
+          chat: `${req.session.color} 님이 퇴장하셨습니다. (채팅방 인원 총 ${socket.adapter.rooms[roomId].length}명)`,
+          number: socket.adapter.rooms[roomId].length
+        }, {
+          headers: {
+            Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
+          },
+        });
       }
     });
     socket.on('dm', (data) => {
@@ -83,6 +84,33 @@ module.exports = (server, app, sessionMiddleware) => {
     });
     socket.on('ban', (data) => {
       socket.to(data.id).emit('ban');
+    });
+
+    // 방장 권한 위임
+    socket.on('hand_over', (data) => {
+      console.log('----------------data--------------------');
+      console.log(data);
+      
+      // 방장 바꾸기
+      axios.post(`http://localhost:8005/room/${roomId}/owner`, {
+        owner: data.userid
+        }, {
+          headers: {
+            Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
+          },
+        });
+
+      // 방장이 바뀌었다는 시스템 메시지
+      axios.post(`http://localhost:8005/room/${roomId}/sys`,{
+        type:'change',
+        user: 'system',
+        chat: `방장이 ${data.owner} 님에서 ${data.userid} 님으로 변경되었습니다.`,
+        number: socket.adapter.rooms[roomId].length
+      }, {
+        headers: {
+          Cookie: `connect.sid=${'s%3A'+cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)}`,
+        },
+      });
     });
   });
 };

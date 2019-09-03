@@ -9,6 +9,7 @@ block content
   #owner
     | 방장 : 
     span#room-owner(style='color:' + room.owner)= room.owner
+  input#room-id(type="hidden", value=room._id)
   fieldset
     legend 채팅 내용
     #chat-list
@@ -58,7 +59,17 @@ block content
       div.appendChild(chat);
       document.querySelector('#chat-list').appendChild(div);
     });
+    socket.on('change', function (data) {
+      document.querySelector('#number-count').textContent = data.number;
+      var div = document.createElement('div');
+      div.classList.add('system');
+      var chat = document.createElement('div');
+      div.textContent = data.chat;
+      div.appendChild(chat);
+      document.querySelector('#chat-list').appendChild(div);
+    });
     socket.on('chat', function (data) {
+
       var div = document.createElement('div');
       if (data.user === '#{user}') {
         
@@ -69,15 +80,16 @@ block content
       var name = document.createElement('div');
       name.textContent = data.user;
       name.className = 'chat-user';
+
       if (data.user !== '#{user}') {
         var dm = document.createElement('button')
         dm.textContent='귓속말';
         dm.className = 'dm';
         dm.dataset.socket = data.socket;
-        dm.addEventListener('click',sendDM);
+        dm.addEventListener('click', sendDM);
         name.appendChild(dm);
       }
-      if (data.user !== '#{user}') {
+      if (data.user !== '#{user}' && '#{user}' == document.getElementById('room-owner').textContent) {
         var ban_b = document.createElement('button');
         ban_b.className = 'ban';
         ban_b.textContent= '강퇴';
@@ -85,6 +97,18 @@ block content
         ban_b.addEventListener('click', ban);
         name.appendChild(ban_b);
       }
+
+      // 방장 위임
+      if (data.user !== '#{user}' && data.user !== document.getElementById('room-owner').textContent) {
+        var handOver = document.createElement('button');
+        handOver.className = 'over';
+        handOver.textContent= '방장 위임';
+        handOver.dataset.socket = data.socket;
+        handOver.dataset.userid = data.user;
+        handOver.addEventListener('click', hand_over);
+        name.appendChild(handOver);
+      }
+
       div.appendChild(name);
       if (data.chat) {
         var chat = document.createElement('div');
@@ -111,7 +135,7 @@ block content
         };
         xhr.open('POST', '/room/#{room._id}/chat');
         xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.send(JSON.stringify({ chat: this.chat.value, sid:socket.id }));
+        xhr.send(JSON.stringify({ chat: this.chat.value, sid: socket.id }));
       }
     });
     document.querySelector('#gif').addEventListener('change', function (e) {
@@ -138,7 +162,7 @@ block content
       addEventListener('click', sendDM);
     })
     socket.on('dm', function(data) {
-      alert(data.from + '님에게서 귓속말이 도착했습니다 : ' + data.msg);
+      alert(data.from + '님에게 도착한 귓속말 : ' + data.msg);
     });
     function ban(e) {
       var id = e.target.dataset.socket;
@@ -146,7 +170,7 @@ block content
       var owner = document.getElementById('room-owner').textContent;
       console.log('#{user}', owner);
       if ('#{user}' === owner && name !== owner) {
-        if (confirm(`상대방을 강퇴하시겠습니까??`)) {
+        if (confirm(`상대방을 강퇴하시겠습니까?`)) {
           socket.emit('ban', {id});
         }
       }
@@ -155,6 +179,21 @@ block content
       addEventListener('click', ban);
     });
     socket.on('ban', function() {
-      alert('방장이 당신을 강제퇴장 시켰습니다.');
+      alert('방장에 의해 강퇴당하셨습니다.');
       location.href = '/';
     });
+
+    // 방장 위임
+    function hand_over (e) {
+
+      var id = e.target.dataset.socket;
+      var owner = document.getElementById('room-owner').textContent;
+      var userid = e.target.dataset.userid;
+      var room_id = document.getElementById('room-id').value;
+      
+      if ('#{user}' === owner) {
+        if (confirm(`${userid} 에게 방장 권한을 위임하시겠습니까?`)) {
+          socket.emit('hand_over', {room_id, owner, id, userid});
+        }
+      }
+    }
